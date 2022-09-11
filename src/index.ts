@@ -1,10 +1,12 @@
 import { Client } from "discord.js";
 import "dotenv/config";
-import setTimer from "./commands/setTimer";
 import setupMongo from "./helpers/setupMongo";
 import setupAgenda from "./helpers/setupAgenda";
 import { Job } from "agenda";
 import guildCreate from "./events/guildCreate";
+import registerCommand from "./discord/registerCommand";
+import handleCommands from "./commands";
+import { RAID_TYPES } from "./constants/digimon";
 
 const runBot = async () => {
   const client = new Client({
@@ -25,38 +27,23 @@ const runBot = async () => {
         .catch(console.error);
     }
 
-    job.schedule(
-      new Date(job.attrs.lastRunAt).getTime() + setTimer.typeValues[type]
-    );
+    job.schedule(new Date(job.attrs.lastRunAt).getTime() + RAID_TYPES[type]);
   });
 
   await client.login(process.env.DISCORD_TOKEN);
 
-  client.on("ready", () => {
+  client.on("ready", async () => {
     console.log(`Logged in as ${client.user.tag}!`);
+
+    await registerCommand(client);
+
+    console.log("Registered commands");
   });
 
   client.on("guildCreate", guildCreate);
 
-  client.on("messageCreate", async (message) => {
-    if (message.author.bot) return;
-
-    if (message.content.includes("!setTimer")) {
-      const args = message.content.split(" ");
-
-      if (setTimer.typeEnum.includes(args[1])) {
-        return setTimer.execute(
-          message,
-          agenda,
-          args[1],
-          setTimer.typeValues[args[1]]
-        );
-      }
-
-      await message.reply(
-        "Please provide the type of event you want to set the timer for"
-      );
-    }
+  client.on("interactionCreate", async (interaction) => {
+    if (interaction.isCommand()) await handleCommands(interaction, agenda);
   });
 };
 
